@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <CL/cl.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/time.h>
 
 #define SRCSIZE 1024*1024
 #define SRCFILE "./rand.cl"
 #define NRANDS 65536
+#define LOGSIZE 1024*1024
 int main(void)
 {
     cl_platform_id platform_id = NULL;
@@ -30,6 +32,8 @@ int main(void)
     int i, j;
     struct timeval tv;
     struct timezone tz;
+    char *logBuf = NULL;
+
 
     gettimeofday(&tv, &tz);
     seed = (int)tv.tv_sec;
@@ -43,7 +47,9 @@ int main(void)
                                          CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &ret);
    
     nBuf = (int *)malloc((nRands + 1)* sizeof(int));
-
+    logBuf = (char *)malloc(LOGSIZE * sizeof(char));
+    memset(logBuf, 0x00, LOGSIZE * sizeof(char));
+   
     srcStr = (char *)malloc(SRCSIZE);
     fp = fopen(SRCFILE, "r");
     codeSize = fread(srcStr, 1, SRCSIZE - 1, fp);
@@ -58,7 +64,12 @@ int main(void)
     // Compile from source
     ret = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
     printf("Compile Result=%d\n", ret);
-
+    if(ret != CL_SUCCESS) {
+       ret = clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 
+				   LOGSIZE - 1, (void *)logBuf, NULL);
+       if(logBuf != NULL) printf("Build Log:\n%s\n", logBuf);
+    }
+   
     // Create Kernel
     kernel = clCreateKernel(program, "CalcRand", &ret);
 
@@ -90,6 +101,7 @@ int main(void)
     ret = clReleaseContext(context);
 
     // Printout results
+    printf("Answer:\n");
     for(i=0; i < NRANDS; i++)  {
 	for(j = 0; j < 16 ; j++) {
 	     printf( "%08x ", nBuf[i * 16 + j] );
@@ -98,6 +110,7 @@ int main(void)
     }
 
     // Free buffer
+    free(logBuf);
     free(nBuf);
     free(srcStr);
 
