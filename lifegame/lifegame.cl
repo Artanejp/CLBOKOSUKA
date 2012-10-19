@@ -8,11 +8,11 @@
 #define ALIVE 1
 #define DEAD 0
 
-uchar DeadOrAlive(__global uchar *src, uchar stat, int x, int y, int w, int h)
+uchar DeadOrAlive(__global uchar *src, int addr, int x, int y, int w, int h)
 {
    int lives = 0;
-   int addr = x + y * w;
-
+//   int addr = x + y * w;
+   uchar stat = src[addr];
    
    // Scan (y, x-1) to (y, x + 1) 
    if(x > 0){ // Normal
@@ -62,16 +62,15 @@ uchar DeadOrAlive(__global uchar *src, uchar stat, int x, int y, int w, int h)
    return stat;
 }
 
-__kernel void lifegamecore(__global uchar *src, int w, int h)
+__kernel void lifegamecore(__global uchar *src, __global uchar *dst, int w, int h)
 {
   uint addr;
   int x, y;
-  
-  // y = 0
+
   addr = 0;
   for(y = 0; y < h; y++) {
      for(x = 0; x < w; x++) {
-     src[addr] = DeadOrAlive(src, src[addr], x, y, w, h);
+     dst[addr] = DeadOrAlive(src, addr, x, y, w, h);
      addr++;
      }
   }

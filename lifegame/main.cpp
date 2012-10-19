@@ -62,7 +62,7 @@ static void BuildBoardRandom(unsigned char *board, int w, int h)
 //    seed = rand();
     for(y = 0; y < h; y++) {
 	for(x = 0; x < w; x++) {
-	    if(rand_r(&seed) < (RAND_MAX / 8)) {
+	    if(rand_r(&seed) < (RAND_MAX / 6)) {
 		board[x + y * w] = 1; // Alive
 	    } else {
 		board[x + y * w] = 0; // Dead
@@ -75,12 +75,14 @@ static void BuildBoardRandom(unsigned char *board, int w, int h)
 }
 
 
-void DoTurn(void)
+static void DoTurn(void)
 {
     int w, h;
     cl_int ret;
-    cl_event event_buf;
+    cl_event event_buf1;
+    cl_event event_buf2;
     cl_event event_exec;
+    cl_event event_copy;
 
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
@@ -88,17 +90,30 @@ void DoTurn(void)
 
     ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
                               w * h * sizeof(unsigned char), (void *)board_s
-                              , 0, NULL, &event_buf);
+                              , 0, NULL, &event_buf1);
     // Wait for complete
-
+    if(ret != CL_SUCCESS) {
+       printf("Error on Send buffer\n");
+       destroy_rss(0);
+    }
+   
+	
     // DO
     ret = clEnqueueTask(command_queue, kernel, 0, NULL, &event_exec);
+    if(ret != CL_SUCCESS) {
+       printf("Error on running program\n");
+       destroy_rss(0);
+    }
     // Wait for complete
 //    ret = clFinish(command_queue);
     // Copy Devidce to HOST
-    ret = clEnqueueReadBuffer(command_queue, src, CL_TRUE, 0,
+    ret = clEnqueueReadBuffer(command_queue, dst, CL_TRUE, 0,
                               w * h * sizeof(unsigned char), (void *)board_s
-                              , 0, NULL, &event_buf);
+                              , 1, &event_exec, &event_buf1);
+    if(ret != CL_SUCCESS) {
+       printf("Error on Receive buffer\n");
+       destroy_rss(0);
+    }
 }
 
 void printresult(unsigned char *p, int turn, int w, int h)
@@ -180,11 +195,13 @@ int main(void)
     
     src  = clCreateBuffer(context, CL_MEM_READ_WRITE,
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
+    dst  = clCreateBuffer(context, CL_MEM_READ_WRITE,
+                               BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
 
     ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
-//    ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
-    ret = clSetKernelArg(kernel, 1, sizeof(int),    (void *)&w);
-    ret = clSetKernelArg(kernel, 2, sizeof(int), (void *)&h);
+    ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
+    ret = clSetKernelArg(kernel, 2, sizeof(int),    (void *)&w);
+    ret = clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
 
     // Set Arg
     printresult(board_s, 0, BOARD_WIDTH, BOARD_HEIGHT);
