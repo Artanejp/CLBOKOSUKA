@@ -1,4 +1,10 @@
-// It is OpenCL test.
+// This is OpenCL test.
+// Lifegame using OpenCL.
+// I tested on Linux box with Phenom2 955 and AMD Radeon HD7700 and proprietary driver.
+// (C) 2012 K.Ohta <whatisthis.sowhat@gmail.com>
+// History: Oct 19,2012 Initial.
+// Licence: BSD
+
 #include <signal.h>
 #include <stdlib.h>
 #include <CL/cl.h>
@@ -10,8 +16,8 @@
 
 #define SRCFILE "./lifegame.cl"
 #define LOGSIZE 1024*1024
-#define BOARD_WIDTH 32
-#define BOARD_HEIGHT 32
+#define BOARD_WIDTH 80
+#define BOARD_HEIGHT 25
 #define SRCSIZE 65536*4
 
 static cl_platform_id platform_id = NULL;
