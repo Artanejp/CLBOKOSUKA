@@ -1,4 +1,9 @@
-// lifegame rules.
+// This is OpenCL test.
+// Lifegame using OpenCL.
+// I tested on Linux box with Phenom2 955 and AMD Radeon HD7700 and proprietary driver.
+// (C) 2012 K.Ohta <whatisthis.sowhat@gmail.com>
+// History: Oct 19,2012 Initial.
+// Licence: BSD
 
 #define ALIVE 1
 #define DEAD 0
