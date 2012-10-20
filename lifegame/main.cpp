@@ -33,6 +33,8 @@ static cl_kernel kernel = NULL;
 static unsigned char *board_s = NULL;
 static char *srcStr;
 
+
+// destroy resources, you must call at all ending.
 int destroy_rss(int n)
 {
     cl_int ret;
@@ -74,7 +76,7 @@ static void BuildBoardRandom(unsigned char *board, int w, int h)
    
 }
 
-
+// Running one turn.
 static void DoTurn(void)
 {
     int w, h;
@@ -87,7 +89,7 @@ static void DoTurn(void)
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
 
-
+    // First, put source data to buffer ("src")  from board.
     ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
                               w * h * sizeof(unsigned char), (void *)board_s
                               , 0, NULL, &event_buf1);
@@ -98,15 +100,14 @@ static void DoTurn(void)
     }
    
 	
-    // DO
+    // Execute kernel (lifegamecore(), in lifegame.cl)
     ret = clEnqueueTask(command_queue, kernel, 0, NULL, &event_exec);
     if(ret != CL_SUCCESS) {
        printf("Error on running program\n");
        destroy_rss(0);
     }
-    // Wait for complete
-//    ret = clFinish(command_queue);
     // Copy Devidce to HOST
+    // After execution, get result to board from buffer("dst").
     ret = clEnqueueReadBuffer(command_queue, dst, CL_TRUE, 0,
                               w * h * sizeof(unsigned char), (void *)board_s
                               , 1, &event_exec, &event_buf1);
@@ -116,6 +117,7 @@ static void DoTurn(void)
     }
 }
 
+// Printout board to console.
 void printresult(unsigned char *p, int turn, int w, int h)
 {
    int x;
@@ -151,7 +153,7 @@ int main(void)
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
 
-   
+    // Init environment
     ret = clGetPlatformIDs(1, &platform_id, &ret_num_platforms);
 
     ret = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id,
@@ -161,7 +163,7 @@ int main(void)
                                          CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &ret);
    
     
-   
+    // Read CL sourcecode from external file.
     srcStr = (char *)malloc(SRCSIZE);
     fp = fopen(SRCFILE, "r");
     codeSize = fread(srcStr, 1, SRCSIZE - 1, fp);
@@ -176,7 +178,7 @@ int main(void)
     // Compile from source
     ret = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
     printf("Compile Result=%d\n", ret);
-    if(ret != CL_SUCCESS) {
+    if(ret != CL_SUCCESS) {  // Printout error log.
        logBuf = (char *)malloc(LOGSIZE * sizeof(char));
        memset(logBuf, 0x00, LOGSIZE * sizeof(char));
        
@@ -186,27 +188,33 @@ int main(void)
        free(logBuf);
        destroy_rss(0);
     }
+   
+    // Initialize board.
     board_s = (unsigned char *)malloc(BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char));
     if(board_s == NULL) destroy_rss(0);
-    BuildBoardRandom(board_s, BOARD_WIDTH, BOARD_HEIGHT);    
+    BuildBoardRandom(board_s, BOARD_WIDTH, BOARD_HEIGHT);
+   
+    // Prepare to execution.
     // Create Kernel
     kernel = clCreateKernel(program, "lifegamecore", &ret);
 
-    
+    // Make two buffer for OpenCL, in (src) and out (dst).
     src  = clCreateBuffer(context, CL_MEM_READ_WRITE,
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
     dst  = clCreateBuffer(context, CL_MEM_READ_WRITE,
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
 
+    // Set arguments for calling CL code.
     ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
     ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
     ret = clSetKernelArg(kernel, 2, sizeof(int),    (void *)&w);
     ret = clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
 
-    // Set Arg
+    // Printout initial condition of bode.
     printresult(board_s, 0, BOARD_WIDTH, BOARD_HEIGHT);
-    signal(15, (sighandler_t)destroy_rss);
-    signal(9, (sighandler_t)destroy_rss);
+    // Resist signal handler ... You *should* resist.
+    signal(15, (sighandler_t)destroy_rss); // SIGTERM (^C)
+    signal(9, (sighandler_t)destroy_rss);  // SIGKILL
 
     // Printout results
     turn = 1;
