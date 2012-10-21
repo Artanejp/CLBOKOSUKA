@@ -8,6 +8,7 @@
 #define ALIVE 1
 #define DEAD 0
 
+// Judge dead or alive to one-cell.
 uchar DeadOrAlive(__global uchar *src, int addr, int x, int y, int w, int h)
 {
    int lives = 0;
@@ -62,6 +63,7 @@ uchar DeadOrAlive(__global uchar *src, int addr, int x, int y, int w, int h)
    return stat;
 }
 
+// Lifegame Core
 __kernel void lifegamecore(__global uchar *src, __global uchar *dst, int w, int h)
 {
   uint addr;

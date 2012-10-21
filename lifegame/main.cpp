@@ -12,14 +12,15 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
-
+#include <SDL/SDL.h>
 
 #define SRCFILE "./lifegame.cl"
 #define LOGSIZE 1024*1024
-#define BOARD_WIDTH 80
-#define BOARD_HEIGHT 25
+#define BOARD_WIDTH 512
+#define BOARD_HEIGHT 512
 #define SRCSIZE 65536*4
 
+static unsigned char *board_s = NULL;
 static cl_platform_id platform_id = NULL;
 static cl_uint ret_num_platforms;
 static cl_device_id device_id = NULL;
@@ -30,14 +31,21 @@ static cl_mem src = NULL;
 static cl_mem dst = NULL;
 static cl_program program = NULL;
 static cl_kernel kernel = NULL;
-static unsigned char *board_s = NULL;
 static char *srcStr;
+
+extern void printresult(unsigned char *p, int turn, int w, int h);
+
+void *SDLDrv_Init(int w, int h);
+void SDLDrv_End(void);
+void SDLDrv_result(unsigned char *p, int turn, int w, int h);
 
 
 // destroy resources, you must call at all ending.
 int destroy_rss(int n)
 {
     cl_int ret;
+   
+    SDLDrv_End();
     // Free
     if(kernel != NULL) ret = clReleaseKernel(kernel);
     if(program != NULL) ret = clReleaseProgram(program);
@@ -117,26 +125,6 @@ static void DoTurn(void)
     }
 }
 
-// Printout board to console.
-void printresult(unsigned char *p, int turn, int w, int h)
-{
-   int x;
-   int y;
-   int addr = 0;
-   printf("\nTurn %d:\n", turn);
-   for(y = 0; y < h ; y++) {
-	for(x = 0; x < w; x++) { 
-	   if(p[addr] == 0) {
-		printf(" ");
-	   } else {
-		printf("O");
-	   }
-	   addr++;
-	}
-       printf("\n");
-   }
-   printf("\n");
-}
 
 
 int main(void)
@@ -211,7 +199,9 @@ int main(void)
     ret = clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
 
     // Printout initial condition of bode.
-    printresult(board_s, 0, BOARD_WIDTH, BOARD_HEIGHT);
+    if(SDLDrv_Init(BOARD_WIDTH, BOARD_HEIGHT) == NULL) destroy_rss(0);
+   
+    SDLDrv_result(board_s, 0, BOARD_WIDTH, BOARD_HEIGHT);
     // Resist signal handler ... You *should* resist.
     signal(15, (sighandler_t)destroy_rss); // SIGTERM (^C)
     signal(9, (sighandler_t)destroy_rss);  // SIGKILL
@@ -219,9 +209,9 @@ int main(void)
     // Printout results
     turn = 1;
     while(1) {
-	sleep(1);
+        SDL_Delay(100);// Wait 100ms.
         DoTurn();
-        printresult(board_s, turn, BOARD_WIDTH, BOARD_HEIGHT);
+        SDLDrv_result(board_s, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;
     }
    
