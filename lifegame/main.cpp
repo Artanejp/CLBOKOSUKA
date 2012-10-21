@@ -103,14 +103,14 @@ static void DoTurn(void)
     h = BOARD_HEIGHT;
 
     // First, put source data to buffer ("src")  from board.
-    ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
-                              w * h * sizeof(unsigned char), (void *)board_s
-                              , 0, NULL, &event_buf1);
-    // Wait for complete
-    if(ret != CL_SUCCESS) {
-       printf("Error on Send buffer\n");
-       destroy_rss(0);
-    }
+//    ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
+//                              w * h * sizeof(unsigned char), (void *)board_s
+//                              , 0, NULL, &event_buf1);
+//    // Wait for complete
+//    if(ret != CL_SUCCESS) {
+//       printf("Error on Send buffer\n");
+//       destroy_rss(0);
+//    }
    
 	
     // Execute kernel (lifegamecore(), in lifegame.cl)
@@ -119,6 +119,7 @@ static void DoTurn(void)
        printf("Error on running program\n");
        destroy_rss(0);
     }
+#if 0   
     // Copy Devidce to HOST
     // After execution, get result to board from buffer("dst").
     ret = clEnqueueReadBuffer(command_queue, dst, CL_TRUE, 0,
@@ -128,18 +129,29 @@ static void DoTurn(void)
        printf("Error on Receive buffer\n");
        destroy_rss(0);
     }
+#else
+    ret = clEnqueueCopyBuffer(command_queue, dst, src, 0, 0,
+                              w * h * sizeof(unsigned char), 1, &event_exec, &event_buf2);
+    if(ret != CL_SUCCESS) {
+       printf("Error on Copy buffer\n");
+       destroy_rss(0);
+    }
+#endif
+
+#if 1
     if(surface == NULL) return;
     SDL_LockSurface(surface);
     ret = clEnqueueReadBuffer(command_queue, smem, CL_TRUE, 0,
                               h * surface->pitch, (void *)(surface->pixels)
-                              , 1, &event_buf2, &event_disp);
+                              , 1, &event_exec, &event_disp);
     SDL_UnlockSurface(surface);
     SDL_UpdateRect(surface, 0, 0, surface->w, surface->h);
     if(ret != CL_SUCCESS) {
-       printf("Error on Receive buffer\n");
+       printf("Error on Drawing buffer\n");
        destroy_rss(0);
     }
-
+#endif
+   
 }
 
 
@@ -148,6 +160,7 @@ int main(void)
 {
     size_t codeSize;
     cl_int ret;
+    cl_event event;
     FILE *fp;
     int seed;
     int init;
@@ -223,9 +236,18 @@ int main(void)
     ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&smem);
     ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
 
-    // Printout initial condition of bode.
 
-   
+    // First, put source data to buffer ("src")  from board.
+    ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
+                              w * h * sizeof(unsigned char), (void *)board_s
+                              , 0, NULL, &event);
+    // Wait for complete
+    if(ret != CL_SUCCESS) {
+       printf("Error on Send buffer\n");
+       destroy_rss(0);
+    }
+
+    // Printout initial condition of bode.   
     SDLDrv_result(board_s, 0, BOARD_WIDTH, BOARD_HEIGHT);
    // Resist signal handler ... You *should* resist.
     signal(15, (sighandler_t)destroy_rss); // SIGTERM (^C)

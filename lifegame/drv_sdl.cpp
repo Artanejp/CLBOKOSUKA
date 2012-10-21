@@ -79,7 +79,7 @@ void SDLDrv_result(unsigned char *p, int turn, int w, int h)
    int addr2;
    Uint32 *q;
    
-   printf("\nTurn %d:\n", turn);
+   printf("\nTurn %d: Tick %d\n", turn, SDL_GetTicks());
    if(surface == NULL) return;
 //   SDL_LockSurface(surface);
 //   q = (Uint32 *)surface->pixels;
