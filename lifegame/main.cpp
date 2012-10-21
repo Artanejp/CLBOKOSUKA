@@ -15,30 +15,35 @@
 #include <SDL/SDL.h>
 
 #define SRCFILE "./lifegame.cl"
+//#define SRCFILE "./board2surface.cl"
 #define LOGSIZE 1024*1024
 #define BOARD_WIDTH 512
 #define BOARD_HEIGHT 512
 #define SRCSIZE 65536*4
 
 static unsigned char *board_s = NULL;
-static cl_platform_id platform_id = NULL;
-static cl_uint ret_num_platforms;
-static cl_device_id device_id = NULL;
-static cl_uint ret_num_devices;
-static cl_context context = NULL;
-static cl_command_queue command_queue = NULL;
+cl_platform_id platform_id = NULL;
+cl_uint ret_num_platforms;
+cl_device_id device_id = NULL;
+cl_uint ret_num_devices;
+cl_context context = NULL;
+cl_command_queue command_queue = NULL;
 static cl_mem src = NULL;
 static cl_mem dst = NULL;
+static cl_mem smem;
 static cl_program program = NULL;
 static cl_kernel kernel = NULL;
 static char *srcStr;
+static SDL_Surface *surface = NULL;
+static char *pixmem = NULL;
+
 
 extern void printresult(unsigned char *p, int turn, int w, int h);
 
 void *SDLDrv_Init(int w, int h);
 void SDLDrv_End(void);
 void SDLDrv_result(unsigned char *p, int turn, int w, int h);
-
+cl_mem SDLDrv_CLInit(SDL_Surface *s);
 
 // destroy resources, you must call at all ending.
 int destroy_rss(int n)
@@ -53,9 +58,8 @@ int destroy_rss(int n)
     if(dst != NULL) ret = clReleaseMemObject(dst);
     if(command_queue != NULL) ret = clReleaseCommandQueue(command_queue);
     if(context != NULL) ret = clReleaseContext(context);
-    if(src != NULL) free(src);
-    if(dst != NULL) free(dst);
     if(board_s != NULL) free(board_s);
+    if(pixmem != NULL)  free(pixmem);
     exit(0);
 }
 
@@ -93,6 +97,7 @@ static void DoTurn(void)
     cl_event event_buf2;
     cl_event event_exec;
     cl_event event_copy;
+    cl_event event_disp;
 
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
@@ -118,11 +123,23 @@ static void DoTurn(void)
     // After execution, get result to board from buffer("dst").
     ret = clEnqueueReadBuffer(command_queue, dst, CL_TRUE, 0,
                               w * h * sizeof(unsigned char), (void *)board_s
-                              , 1, &event_exec, &event_buf1);
+                              , 1, &event_exec, &event_buf2);
     if(ret != CL_SUCCESS) {
        printf("Error on Receive buffer\n");
        destroy_rss(0);
     }
+    if(surface == NULL) return;
+    SDL_LockSurface(surface);
+    ret = clEnqueueReadBuffer(command_queue, smem, CL_TRUE, 0,
+                              h * surface->pitch, (void *)(surface->pixels)
+                              , 1, &event_buf2, &event_disp);
+    SDL_UnlockSurface(surface);
+    SDL_UpdateRect(surface, 0, 0, surface->w, surface->h);
+    if(ret != CL_SUCCESS) {
+       printf("Error on Receive buffer\n");
+       destroy_rss(0);
+    }
+
 }
 
 
@@ -138,6 +155,7 @@ int main(void)
     int w, h;
     char *logBuf = NULL;
     int turn;
+    int pitch;
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
 
@@ -191,18 +209,25 @@ int main(void)
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
     dst  = clCreateBuffer(context, CL_MEM_READ_WRITE,
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
+    surface = (SDL_Surface *)SDLDrv_Init(BOARD_WIDTH, BOARD_HEIGHT);
+    if(surface == NULL) destroy_rss(0);
+//    pixmem = malloc(h * surface->pitch * sizeof(Uint32));
+    smem = SDLDrv_CLInit(surface);
+    pitch = surface->pitch;
 
     // Set arguments for calling CL code.
     ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
     ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
     ret = clSetKernelArg(kernel, 2, sizeof(int),    (void *)&w);
     ret = clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
+    ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&smem);
+    ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
 
     // Printout initial condition of bode.
-    if(SDLDrv_Init(BOARD_WIDTH, BOARD_HEIGHT) == NULL) destroy_rss(0);
+
    
     SDLDrv_result(board_s, 0, BOARD_WIDTH, BOARD_HEIGHT);
-    // Resist signal handler ... You *should* resist.
+   // Resist signal handler ... You *should* resist.
     signal(15, (sighandler_t)destroy_rss); // SIGTERM (^C)
     signal(9, (sighandler_t)destroy_rss);  // SIGKILL
 

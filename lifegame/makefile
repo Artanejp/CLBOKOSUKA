@@ -13,7 +13,9 @@ CLSDK_INC = /usr/include
 CLSDK_LIB = -lOpenCL
 
 .SUFFIXES: .c .cpp .asm .o
-SRCS = main.cpp
+SRCS = main.cpp \
+	drv_console.cpp drv_sdl.cpp
+	
 CLSRCS = lifegame.cl
 
 
@@ -31,7 +33,7 @@ all: lifegame
 
 # rules
 lifegame: ${OBJS}
-	$(CXX) -o lifegame $^ ${CLSDK_LIB}
+	$(CXX) -o lifegame $^ ${CLSDK_LIB} -lSDL
 	
 %.o: %.cpp
 	$(CXX) ${CXXFLAGS} -o $@ -c $(filter %.cpp, $<)
