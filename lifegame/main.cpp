@@ -33,6 +33,7 @@ static cl_mem dst = NULL;
 static cl_mem smem;
 static cl_program program = NULL;
 static cl_kernel kernel = NULL;
+static cl_event event_exec;
 static char *srcStr;
 static SDL_Surface *surface = NULL;
 static char *pixmem = NULL;
@@ -42,7 +43,7 @@ extern void printresult(unsigned char *p, int turn, int w, int h);
 
 void *SDLDrv_Init(int w, int h);
 void SDLDrv_End(void);
-void SDLDrv_result(unsigned char *p, int turn, int w, int h);
+void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h);
 cl_mem SDLDrv_CLInit(SDL_Surface *s);
 
 // destroy resources, you must call at all ending.
@@ -95,9 +96,7 @@ static void DoTurn(void)
     cl_int ret;
     cl_event event_buf1;
     cl_event event_buf2;
-    cl_event event_exec;
     cl_event event_copy;
-    cl_event event_disp;
 
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
@@ -120,7 +119,7 @@ static void DoTurn(void)
        destroy_rss(0);
     }
 #if 0   
-    // Copy Devidce to HOST
+    // Copy Device to HOST
     // After execution, get result to board from buffer("dst").
     ret = clEnqueueReadBuffer(command_queue, dst, CL_TRUE, 0,
                               w * h * sizeof(unsigned char), (void *)board_s
@@ -138,19 +137,6 @@ static void DoTurn(void)
     }
 #endif
 
-#if 1
-    if(surface == NULL) return;
-    SDL_LockSurface(surface);
-    ret = clEnqueueReadBuffer(command_queue, smem, CL_TRUE, 0,
-                              h * surface->pitch, (void *)(surface->pixels)
-                              , 1, &event_exec, &event_disp);
-    SDL_UnlockSurface(surface);
-    SDL_UpdateRect(surface, 0, 0, surface->w, surface->h);
-    if(ret != CL_SUCCESS) {
-       printf("Error on Drawing buffer\n");
-       destroy_rss(0);
-    }
-#endif
    
 }
 
@@ -224,7 +210,6 @@ int main(void)
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
     surface = (SDL_Surface *)SDLDrv_Init(BOARD_WIDTH, BOARD_HEIGHT);
     if(surface == NULL) destroy_rss(0);
-//    pixmem = malloc(h * surface->pitch * sizeof(Uint32));
     smem = SDLDrv_CLInit(surface);
     pitch = surface->pitch;
 
@@ -237,7 +222,7 @@ int main(void)
     ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
 
 
-    // First, put source data to buffer ("src")  from board.
+    // First, put initial-source data to buffer ("src")  from board.
     ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
                               w * h * sizeof(unsigned char), (void *)board_s
                               , 0, NULL, &event);
@@ -248,7 +233,6 @@ int main(void)
     }
 
     // Printout initial condition of bode.   
-    SDLDrv_result(board_s, 0, BOARD_WIDTH, BOARD_HEIGHT);
    // Resist signal handler ... You *should* resist.
     signal(15, (sighandler_t)destroy_rss); // SIGTERM (^C)
     signal(9, (sighandler_t)destroy_rss);  // SIGKILL
@@ -258,7 +242,8 @@ int main(void)
     while(1) {
         SDL_Delay(100);// Wait 100ms.
         DoTurn();
-        SDLDrv_result(board_s, turn, BOARD_WIDTH, BOARD_HEIGHT);
+        SDLDrv_result(smem, &event_exec, turn, BOARD_WIDTH, BOARD_HEIGHT);
+//        SDLDrv_result(board_s, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;
     }
    

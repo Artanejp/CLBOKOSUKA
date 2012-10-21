@@ -71,32 +71,29 @@ void SDLDrv_End(void)
 }
 
 
-void SDLDrv_result(unsigned char *p, int turn, int w, int h)
+void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h)
 {
    int x;
    int y;
    int addr = 0;
    int addr2;
+   cl_int ret;
    Uint32 *q;
+   cl_event event_disp;
    
    printf("\nTurn %d: Tick %d\n", turn, SDL_GetTicks());
    if(surface == NULL) return;
-//   SDL_LockSurface(surface);
-//   q = (Uint32 *)surface->pixels;
-//   for(y = 0; y < h ; y++) {
-//      addr2 = surface->pitch * y / sizeof(Uint32);
-//	for(x = 0; x < w; x++) { 
-//	   if(p[addr] == 0) {
-//	      q[addr2] = 0xff000000;
-//	   } else {
-//	      q[addr2] = 0xffffffff;
-//	   }
-//	   addr++;
-//	   addr2++;
-//	}
-//   }
-//   SDL_UnlockSurface(surface);
-//   SDL_UpdateRect(surface, 0, 0, w, h);
+    SDL_LockSurface(surface);
+    ret = clEnqueueReadBuffer(command_queue, smem, CL_TRUE, 0,
+                              h * surface->pitch, (void *)(surface->pixels)
+                              , 1, waitevent, &event_disp);
+    SDL_UnlockSurface(surface);
+    if(ret != CL_SUCCESS) {
+       printf("Error on Drawing buffer\n");
+       destroy_rss(0);
+    }
+
+   SDL_UpdateRect(surface, 0, 0, w, h);
 }
 
    
