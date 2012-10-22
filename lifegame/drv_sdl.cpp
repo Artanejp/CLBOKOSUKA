@@ -43,7 +43,7 @@ void *SDLDrv_Init(int w, int h)
 // 20121022 Use OpenGL
    SDL_Init(SDL_INIT_EVERYTHING);
 
-   surface = SDL_SetVideoMode(w, h, 32, SDL_SWSURFACE | SDL_ASYNCBLIT);
+   surface = SDL_SetVideoMode(w, h, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
        
    return (void *)surface;
 }
@@ -86,7 +86,7 @@ void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h)
    if(surface == NULL) return;
     SDL_LockSurface(surface);
     ret = clEnqueueReadBuffer(command_queue, smem, CL_TRUE, 0,
-                              h * w * sizeof(Uint32), (void *)(surface->pixels)
+                              h * surface->pitch, (void *)(surface->pixels)
                               , 1, waitevent, &event_disp);
     SDL_UnlockSurface(surface);
     if(ret != CL_SUCCESS) {
@@ -95,6 +95,7 @@ void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h)
     }
 
    SDL_UpdateRect(surface, 0, 0, w, h);
+   SDL_Flip(surface);
 }
 
    

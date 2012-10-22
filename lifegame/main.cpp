@@ -244,10 +244,9 @@ int main(void)
     // Printout results
     turn = 1;
     while(1) {
-        SDL_Delay(100);// Wait 100ms.
+        SDL_Delay(10);// Wait 100ms.
         DoTurn();
         SDLDrv_result(smem, &event_exec, turn, BOARD_WIDTH, BOARD_HEIGHT);
-//        SDLDrv_result(board_s, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;
     }
    
