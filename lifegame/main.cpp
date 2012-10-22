@@ -16,7 +16,6 @@
 #include <SDL/SDL.h>
 
 #define SRCFILE "./lifegame.cl"
-//#define SRCFILE "./board2surface.cl"
 #define LOGSIZE 1024*1024
 #define BOARD_WIDTH 512
 #define BOARD_HEIGHT 512
@@ -35,17 +34,21 @@ static cl_mem smem;
 static cl_program program = NULL;
 static cl_kernel kernel = NULL;
 static cl_event event_exec;
+static cl_event event_buf1;
+static cl_event event_buf2;
+static cl_event event_copy;
+
 static char *srcStr;
-static SDL_Surface *surface = NULL;
 static char *pixmem = NULL;
 
-
+extern SDL_Surface *surface;
+extern SDL_Surface *ssource;
 extern void printresult(unsigned char *p, int turn, int w, int h);
 
-void *SDLDrv_Init(int w, int h);
-void SDLDrv_End(void);
-void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h);
-cl_mem SDLDrv_CLInit(int w, int h);
+extern void *SDLDrv_Init(int w, int h);
+extern void SDLDrv_End(void);
+extern void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h);
+extern cl_mem SDLDrv_CLInit(int w, int h);
 
 // destroy resources, you must call at all ending.
 int destroy_rss(int n)
@@ -96,22 +99,14 @@ static void DoTurn(void)
     int w, h;
     cl_int ret;
     int pitch;
-    cl_event event_buf1;
-    cl_event event_buf2;
-    cl_event event_copy;
 
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
-    pitch = BOARD_WIDTH * sizeof(Uint32);
-    // First, put source data to buffer ("src")  from board.
-//    ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
-//                              w * h * sizeof(unsigned char), (void *)board_s
-//                              , 0, NULL, &event_buf1);
-//    // Wait for complete
-//    if(ret != CL_SUCCESS) {
-//       printf("Error on Send buffer\n");
-//       destroy_rss(0);
-//    }
+    if(ssource != NULL) {
+       pitch = ssource->pitch;
+    } else {
+       pitch = w * sizeof(Uint32);
+    }
    
     ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
     ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
@@ -120,9 +115,6 @@ static void DoTurn(void)
     ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&smem);
     ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
 
-    ret = clEnqueueAcquireGLObjects(command_queue,
-			       1, &smem,
-			       0, NULL, &event_buf1);
     // Execute kernel (lifegamecore(), in lifegame.cl)
     ret = clEnqueueTask(command_queue, kernel, 0, NULL, &event_exec);
     if(ret != CL_SUCCESS) {
@@ -132,24 +124,13 @@ static void DoTurn(void)
 
 
 
-#if 0   
-    // Copy Device to HOST
-    // After execution, get result to board from buffer("dst").
-    ret = clEnqueueReadBuffer(command_queue, dst, CL_TRUE, 0,
-                              w * h * sizeof(unsigned char), (void *)board_s
-                              , 1, &event_exec, &event_buf2);
-    if(ret != CL_SUCCESS) {
-       printf("Error on Receive buffer\n");
-       destroy_rss(0);
-    }
-#else
     ret = clEnqueueCopyBuffer(command_queue, dst, src, 0, 0,
                               w * h * sizeof(unsigned char), 1, &event_exec, &event_buf2);
     if(ret != CL_SUCCESS) {
        printf("Error on Copy buffer\n");
        destroy_rss(0);
     }
-#endif
+
 
    
 }
@@ -222,8 +203,7 @@ int main(void)
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
     dst  = clCreateBuffer(context, CL_MEM_READ_WRITE,
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
-    surface = (SDL_Surface *)SDLDrv_Init(BOARD_WIDTH, BOARD_HEIGHT);
-    if(surface == NULL) destroy_rss(0);
+    if(SDLDrv_Init(BOARD_WIDTH, BOARD_HEIGHT) == NULL) destroy_rss(0);
     smem = SDLDrv_CLInit(BOARD_WIDTH, BOARD_HEIGHT);
     if(smem == NULL) destroy_rss(0);
    
@@ -241,12 +221,21 @@ int main(void)
     signal(15, (sighandler_t)destroy_rss); // SIGTERM (^C)
     signal(9, (sighandler_t)destroy_rss);  // SIGKILL
 
+    // First, put source data to buffer ("src")  from board.
+    ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
+                              w * h * sizeof(unsigned char), (void *)board_s
+                              , 0, NULL, &event_buf1);
+    // Wait for complete
+    if(ret != CL_SUCCESS) {
+       printf("Error on Send buffer\n");
+       destroy_rss(0);
+    }
     // Printout results
     turn = 1;
     while(1) {
-        SDL_Delay(10);// Wait 100ms.
+        SDL_Delay(100);// Wait 100ms.
         DoTurn();
-        SDLDrv_result(smem, &event_exec, turn, BOARD_WIDTH, BOARD_HEIGHT);
+        SDLDrv_result(smem, &event_buf2, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;
     }
    

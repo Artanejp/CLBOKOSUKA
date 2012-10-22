@@ -14,9 +14,8 @@
 #include <CL/cl_gl.h>
 
 static SDL_Surface *surface = NULL;
-static char *ssource;
+SDL_Surface *ssource = NULL;
 
-#define SRCFILE "./board2surface.cl"
 #define LOGSIZE 1024*1024
 #define BOARD_WIDTH 512
 #define BOARD_HEIGHT 512
@@ -44,8 +43,10 @@ void *SDLDrv_Init(int w, int h)
    SDL_Init(SDL_INIT_EVERYTHING);
 
    surface = SDL_SetVideoMode(w, h, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
+   ssource = SDL_CreateRGBSurface(SDL_SWSURFACE | SDL_SRCALPHA, w, h, 32,
+			    0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000);
        
-   return (void *)surface;
+   return (void *)ssource;
 }
 
 cl_mem SDLDrv_CLInit(int w, int h)
@@ -67,7 +68,7 @@ void SDLDrv_End(void)
        // Free
     if(kernel != NULL) ret = clReleaseKernel(kernel);
     if(program != NULL) ret = clReleaseProgram(program);
-    if(ssource != NULL) free(ssource);
+    if(ssource != NULL) SDL_FreeSurface(ssource);
    surface = NULL;
 }
 
@@ -84,17 +85,19 @@ void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h)
    
    printf("\nTurn %d: Tick %d\n", turn, SDL_GetTicks());
    if(surface == NULL) return;
-    SDL_LockSurface(surface);
+   if(ssource == NULL) return;
+    SDL_LockSurface(ssource);
     ret = clEnqueueReadBuffer(command_queue, smem, CL_TRUE, 0,
-                              h * surface->pitch, (void *)(surface->pixels)
-                              , 1, waitevent, &event_disp);
-    SDL_UnlockSurface(surface);
+                              h * ssource->pitch, (void *)(ssource->pixels)
+                              , 0, NULL, &event_disp);
+    SDL_UnlockSurface(ssource);
     if(ret != CL_SUCCESS) {
        printf("Error on Drawing buffer\n");
        destroy_rss(0);
     }
-
-   SDL_UpdateRect(surface, 0, 0, w, h);
+//   SDL_UpdateRect(ssource, 0, 0, w, h);
+   SDL_BlitSurface(ssource, NULL, surface, NULL);
+//   SDL_UpdateRect(surface, 0, 0, w, h);
    SDL_Flip(surface);
 }
 

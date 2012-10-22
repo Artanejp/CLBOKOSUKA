@@ -149,7 +149,8 @@ void memcpy8(__global uchar *dst, __global uchar *src, int bytes)
 }
 
 // Lifegame Core, judge and draw to surface.
-__kernel void lifegamecore(__global uchar *src, __global uchar *dst, int w, int h, __global uint *pixels, int pitch)
+__kernel void lifegamecore(__global uchar *src, __global uchar *dst,
+                           int w, int h, __global uint *pixels, int pitch)
 {
   uint addr;
   int x, y;
