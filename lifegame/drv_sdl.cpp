@@ -9,7 +9,9 @@
 // Printout board to console.
 #include <stdio.h>
 #include <SDL/SDL.h>
+#include <GL/gl.h>
 #include <CL/cl.h>
+#include <CL/cl_gl.h>
 
 static SDL_Surface *surface = NULL;
 static char *ssource;
@@ -20,9 +22,7 @@ static char *ssource;
 #define BOARD_HEIGHT 512
 #define SRCSIZE 65536*4
 
-static unsigned char *board_s = NULL;
-static cl_mem src = NULL;
-static cl_mem dst = NULL;
+static cl_mem mtexture = NULL;
 static cl_program program = NULL;
 static cl_kernel kernel = NULL;
 
@@ -33,25 +33,27 @@ extern cl_uint ret_num_devices;
 extern cl_context context;
 extern cl_command_queue command_queue;
 
-
 extern int destroy_rss(int n);
 
+
+
+   
 void *SDLDrv_Init(int w, int h)
 {
+// 20121022 Use OpenGL
    SDL_Init(SDL_INIT_EVERYTHING);
-   surface = SDL_SetVideoMode(w, h, 32, SDL_HWSURFACE | SDL_ASYNCBLIT);
+
+   surface = SDL_SetVideoMode(w, h, 32, SDL_SWSURFACE | SDL_ASYNCBLIT);
+       
    return (void *)surface;
 }
 
-cl_mem SDLDrv_CLInit(SDL_Surface *s)
+cl_mem SDLDrv_CLInit(int w, int h)
 {
    cl_int ret;
-   size_t codeSize;
-   int pitch;
-   if(s == NULL) return NULL;
-    dst  = clCreateBuffer(context, CL_MEM_READ_WRITE,
-                               s->h * s->pitch, NULL, &ret);
-    pitch = s->pitch;
+   cl_mem dst;
+   dst  = clCreateBuffer(context, CL_MEM_READ_WRITE,
+                         w * h * sizeof(Uint32), NULL, &ret);
    
    return dst;
 }
@@ -65,7 +67,6 @@ void SDLDrv_End(void)
        // Free
     if(kernel != NULL) ret = clReleaseKernel(kernel);
     if(program != NULL) ret = clReleaseProgram(program);
-    if(src != NULL) ret = clReleaseMemObject(src);
     if(ssource != NULL) free(ssource);
    surface = NULL;
 }
@@ -85,7 +86,7 @@ void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h)
    if(surface == NULL) return;
     SDL_LockSurface(surface);
     ret = clEnqueueReadBuffer(command_queue, smem, CL_TRUE, 0,
-                              h * surface->pitch, (void *)(surface->pixels)
+                              h * w * sizeof(Uint32), (void *)(surface->pixels)
                               , 1, waitevent, &event_disp);
     SDL_UnlockSurface(surface);
     if(ret != CL_SUCCESS) {

@@ -6,8 +6,8 @@
 
 CXX = g++
 CC = gcc
-#CFLAGS = -O0 -g
-CFLAGS = -O3 -ftree-vectorize -msse -mmmx -msse2
+CFLAGS = -O0 -g
+#CFLAGS = -O3 -ftree-vectorize -msse -mmmx -msse2
 
 
 CLSDK_INC = /usr/include
@@ -34,7 +34,7 @@ all: lifegame
 
 # rules
 lifegame: ${OBJS}
-	$(CXX) -o lifegame $^ ${CLSDK_LIB} -lSDL
+	$(CXX) -o lifegame $^ ${CLSDK_LIB} -lSDL -lGL
 	
 %.o: %.cpp
 	$(CXX) ${CXXFLAGS} -o $@ -c $(filter %.cpp, $<)

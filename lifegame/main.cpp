@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <CL/cl.h>
+#include <CL/cl_gl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
@@ -44,7 +45,7 @@ extern void printresult(unsigned char *p, int turn, int w, int h);
 void *SDLDrv_Init(int w, int h);
 void SDLDrv_End(void);
 void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h);
-cl_mem SDLDrv_CLInit(SDL_Surface *s);
+cl_mem SDLDrv_CLInit(int w, int h);
 
 // destroy resources, you must call at all ending.
 int destroy_rss(int n)
@@ -94,13 +95,14 @@ static void DoTurn(void)
 {
     int w, h;
     cl_int ret;
+    int pitch;
     cl_event event_buf1;
     cl_event event_buf2;
     cl_event event_copy;
 
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
-
+    pitch = BOARD_WIDTH * sizeof(Uint32);
     // First, put source data to buffer ("src")  from board.
 //    ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
 //                              w * h * sizeof(unsigned char), (void *)board_s
@@ -111,13 +113,25 @@ static void DoTurn(void)
 //       destroy_rss(0);
 //    }
    
-	
+    ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
+    ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
+    ret = clSetKernelArg(kernel, 2, sizeof(int),    (void *)&w);
+    ret = clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
+    ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&smem);
+    ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
+
+    ret = clEnqueueAcquireGLObjects(command_queue,
+			       1, &smem,
+			       0, NULL, &event_buf1);
     // Execute kernel (lifegamecore(), in lifegame.cl)
     ret = clEnqueueTask(command_queue, kernel, 0, NULL, &event_exec);
     if(ret != CL_SUCCESS) {
        printf("Error on running program\n");
        destroy_rss(0);
     }
+
+
+
 #if 0   
     // Copy Device to HOST
     // After execution, get result to board from buffer("dst").
@@ -210,22 +224,12 @@ int main(void)
                                BOARD_WIDTH * BOARD_HEIGHT * sizeof(unsigned char), NULL, &ret);
     surface = (SDL_Surface *)SDLDrv_Init(BOARD_WIDTH, BOARD_HEIGHT);
     if(surface == NULL) destroy_rss(0);
-    smem = SDLDrv_CLInit(surface);
-    pitch = surface->pitch;
-
+    smem = SDLDrv_CLInit(BOARD_WIDTH, BOARD_HEIGHT);
+    if(smem == NULL) destroy_rss(0);
+   
     // Set arguments for calling CL code.
-    ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
-    ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
-    ret = clSetKernelArg(kernel, 2, sizeof(int),    (void *)&w);
-    ret = clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
-    ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&smem);
-    ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
 
 
-    // First, put initial-source data to buffer ("src")  from board.
-    ret = clEnqueueWriteBuffer(command_queue, src, CL_TRUE, 0,
-                              w * h * sizeof(unsigned char), (void *)board_s
-                              , 0, NULL, &event);
     // Wait for complete
     if(ret != CL_SUCCESS) {
        printf("Error on Send buffer\n");
