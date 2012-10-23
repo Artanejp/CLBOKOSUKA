@@ -9,7 +9,7 @@
 #define DEAD 0
 
 // Draw board to surface, using SIMD.
-void board2surface(__global uchar *src, __global uint *dst, int w, int h, int pitch)
+void board2surface(__global uchar *src, __global uint *dst, int w, int h, int pitch, int ystart, int hh)
 {
   int x, y;
   int ww, wmod;
@@ -24,12 +24,12 @@ void board2surface(__global uchar *src, __global uint *dst, int w, int h, int pi
   wmod = w % 8;
   
   p = (__global uchar8 *)src;
-  for(y = 0; y < h; y++) {
+  for(y = ystart; y < (hh + ystart); y++) {
       dq = (__global uint *)&dst[pitch * y / sizeof(uint)];
       dp = (__global uint8 *)dq;
       dq = &dq[ww * 8];
       p = (__global uchar8 *)&src[y * w];
-      q = (__global uchar *)&src[y * w];
+      q = (__global uchar *)p;
       q = &q[ww * 8];
       
       for(x = 0; x < w; x += 8) {
@@ -182,6 +182,60 @@ __kernel void lifegamecore(__global uchar *src, __global uchar *dst,
          }
      }
   }
-  board2surface(src, pixels, w, h, pitch);
+  board2surface(src, pixels, w, h, pitch, 0, h);
+//  memcpy8(src, dst, w * h);
+}
+
+// Lifegame Core, judge and draw to surface.
+__kernel void lifegamecore_parallel(__global uchar *src, __global uchar *dst,
+                           int w, int h, __global uint *pixels, int pitch)
+{
+  uint addr;
+  int x, y;
+  int wmod = w % 8;
+  int ww = w / 8;
+  int hh;
+  int ybegin;
+  int gid;
+  int t;
+  __global uchar8 *dst8;
+  uchar8 d;
+  
+  t = get_global_size(0);
+  gid = get_global_id(0);
+//  gid = get_local_id(0);
+  addr = 0;
+  ybegin = (gid * h) / t;
+  hh = ((gid + 1) * h) / t;
+  if(hh > h) {
+     hh = h - ybegin;
+  } else {
+     hh = hh - ybegin;
+  }
+//  *dst8 = (__global uchar8 *)dst;
+  for(y = ybegin; y < (hh + ybegin); y++) {
+     addr = y * w;
+     dst8 = (__global uchar8 *)&dst[addr];
+     
+     for(x = 0; x < ww; x++) {
+         d.s0 = DeadOrAlive(src, addr + 0, x * 8 + 0, y, w, h);
+         d.s1 = DeadOrAlive(src, addr + 1, x * 8 + 1, y, w, h);
+         d.s2 = DeadOrAlive(src, addr + 2, x * 8 + 2, y, w, h);
+         d.s3 = DeadOrAlive(src, addr + 3, x * 8 + 3, y, w, h);
+         d.s4 = DeadOrAlive(src, addr + 4, x * 8 + 4, y, w, h);
+         d.s5 = DeadOrAlive(src, addr + 5, x * 8 + 5, y, w, h);
+         d.s6 = DeadOrAlive(src, addr + 6, x * 8 + 6, y, w, h);
+         d.s7 = DeadOrAlive(src, addr + 7, x * 8 + 7, y, w, h);
+	 *dst8++ = d;
+         addr += 8;
+     }
+     if(wmod != 0) {
+         for(x = 0; x < wmod; x++) {
+             dst[addr] = DeadOrAlive(src, addr, x + ww << 3, y, w, h);
+             addr++;
+         }
+     }
+  }
+  board2surface(src, pixels, w, h, pitch, ybegin, hh);
 //  memcpy8(src, dst, w * h);
 }

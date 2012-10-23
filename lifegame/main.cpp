@@ -94,11 +94,15 @@ static void BuildBoardRandom(unsigned char *board, int w, int h)
 }
 
 // Running one turn.
-static void DoTurn(void)
+static void DoTurn(int parallel)
 {
     int w, h;
     cl_int ret;
     int pitch;
+    size_t *goff = NULL;
+    size_t gws[] = {parallel};
+    size_t lws[] = {4};
+   
 
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
@@ -116,7 +120,10 @@ static void DoTurn(void)
     ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
 
     // Execute kernel (lifegamecore(), in lifegame.cl)
-    ret = clEnqueueTask(command_queue, kernel, 0, NULL, &event_exec);
+//    ret = clEnqueueTask(command_queue, kernel, 0, NULL, &event_exec);
+    ret = clEnqueueNDRangeKernel(command_queue, kernel, 1, 
+				 goff, gws, lws, 
+				 0, NULL, &event_exec);
     if(ret != CL_SUCCESS) {
        printf("Error on running program\n");
        destroy_rss(0);
@@ -125,7 +132,8 @@ static void DoTurn(void)
 
 
     ret = clEnqueueCopyBuffer(command_queue, dst, src, 0, 0,
-                              w * h * sizeof(unsigned char), 1, &event_exec, &event_buf2);
+                              w * h * sizeof(unsigned char), 
+			      1, &event_exec, &event_buf2);
     if(ret != CL_SUCCESS) {
        printf("Error on Copy buffer\n");
        destroy_rss(0);
@@ -196,7 +204,8 @@ int main(void)
    
     // Prepare to execution.
     // Create Kernel
-    kernel = clCreateKernel(program, "lifegamecore", &ret);
+//    kernel = clCreateKernel(program, "lifegamecore", &ret);
+    kernel = clCreateKernel(program, "lifegamecore_parallel", &ret);
 
     // Make two buffer for OpenCL, in (src) and out (dst).
     src  = clCreateBuffer(context, CL_MEM_READ_WRITE,
@@ -234,7 +243,7 @@ int main(void)
     turn = 1;
     while(1) {
         SDL_Delay(100);// Wait 100ms.
-        DoTurn();
+        DoTurn(128);
         SDLDrv_result(smem, &event_buf2, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;
     }
