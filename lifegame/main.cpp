@@ -20,6 +20,7 @@
 #define BOARD_WIDTH 512
 #define BOARD_HEIGHT 512
 #define SRCSIZE 65536*4
+#define PARALLEL_FACTOR 128
 
 static unsigned char *board_s = NULL;
 cl_platform_id platform_id = NULL;
@@ -243,7 +244,7 @@ int main(void)
     turn = 1;
     while(1) {
         SDL_Delay(100);// Wait 100ms.
-        DoTurn(128);
+        DoTurn(PARALEL_FACTOR);
         SDLDrv_result(smem, &event_buf2, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;
     }
