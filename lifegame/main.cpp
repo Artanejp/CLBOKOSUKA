@@ -20,7 +20,7 @@
 #define BOARD_WIDTH 512
 #define BOARD_HEIGHT 512
 #define SRCSIZE 65536*4
-#define PARALLEL_FACTOR 128
+#define PARALLEL_FACTOR 512
 
 static unsigned char *board_s = NULL;
 cl_platform_id platform_id = NULL;
@@ -107,8 +107,8 @@ static void DoTurn(int parallel)
 
     w = BOARD_WIDTH;
     h = BOARD_HEIGHT;
-    if(ssource != NULL) {
-       pitch = ssource->pitch;
+    if(surface != NULL) {
+       pitch = surface->pitch;
     } else {
        pitch = w * sizeof(Uint32);
     }
@@ -243,8 +243,8 @@ int main(void)
     // Printout results
     turn = 1;
     while(1) {
-        SDL_Delay(100);// Wait 100ms.
-        DoTurn(PARALEL_FACTOR);
+        SDL_Delay(10);// Wait 10ms.
+        DoTurn(PARALLEL_FACTOR);
         SDLDrv_result(smem, &event_buf2, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;
     }
