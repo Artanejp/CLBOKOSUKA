@@ -17,10 +17,10 @@
 
 #define SRCFILE "./lifegame.cl"
 #define LOGSIZE 1024*1024
-#define BOARD_WIDTH 512
-#define BOARD_HEIGHT 512
+#define BOARD_WIDTH 1024
+#define BOARD_HEIGHT 1024
 #define SRCSIZE 65536*4
-#define PARALLEL_FACTOR 512
+#define PARALLEL_FACTOR 2048
 
 static unsigned char *board_s = NULL;
 cl_platform_id platform_id = NULL;
@@ -50,6 +50,7 @@ extern void *SDLDrv_Init(int w, int h);
 extern void SDLDrv_End(void);
 extern void SDLDrv_result(cl_mem smem, cl_event *waitevent, int turn, int w, int h);
 extern cl_mem SDLDrv_CLInit(int w, int h);
+extern const char *lifegame; // Source Code.
 
 // destroy resources, you must call at all ending.
 int destroy_rss(int n)
@@ -113,12 +114,15 @@ static void DoTurn(int parallel)
        pitch = w * sizeof(Uint32);
     }
    
-    ret = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
-    ret = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
-    ret = clSetKernelArg(kernel, 2, sizeof(int),    (void *)&w);
-    ret = clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
-    ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&smem);
-    ret = clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
+    // Create Kernel
+    kernel = clCreateKernel(program, "lifegamecore_parallel", &ret);
+
+    ret |= clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&src);
+    ret |= clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&dst);
+    ret |= clSetKernelArg(kernel, 2, sizeof(int),    (void *)&w);
+    ret |= clSetKernelArg(kernel, 3, sizeof(int), (void *)&h);
+    ret |= clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&smem);
+    ret |= clSetKernelArg(kernel, 5, sizeof(int), (void *)&pitch);
 
     // Execute kernel (lifegamecore(), in lifegame.cl)
 //    ret = clEnqueueTask(command_queue, kernel, 0, NULL, &event_exec);
@@ -139,8 +143,9 @@ static void DoTurn(int parallel)
        printf("Error on Copy buffer\n");
        destroy_rss(0);
     }
-
-
+    clFinish(command_queue);
+    if(kernel != NULL) ret = clReleaseKernel(kernel);
+    kernel = NULL;
    
 }
 
@@ -173,11 +178,11 @@ int main(void)
    
     
     // Read CL sourcecode from external file.
-    srcStr = (char *)malloc(SRCSIZE);
-    fp = fopen(SRCFILE, "r");
-    codeSize = fread(srcStr, 1, SRCSIZE - 1, fp);
-    fclose(fp);
-    
+//    srcStr = (char *)malloc(SRCSIZE);
+//    fp = fopen(SRCFILE, "r");
+//    codeSize = fread(srcStr, 1, SRCSIZE - 1, fp);
+//    fclose(fp);
+    srcStr = (char *)lifegame;
     
     // Build prepare program ID
     program = clCreateProgramWithSource(context, 1, (const char **)&srcStr,
@@ -206,7 +211,7 @@ int main(void)
     // Prepare to execution.
     // Create Kernel
 //    kernel = clCreateKernel(program, "lifegamecore", &ret);
-    kernel = clCreateKernel(program, "lifegamecore_parallel", &ret);
+//    kernel = clCreateKernel(program, "lifegamecore_parallel", &ret);
 
     // Make two buffer for OpenCL, in (src) and out (dst).
     src  = clCreateBuffer(context, CL_MEM_READ_WRITE,
@@ -243,7 +248,7 @@ int main(void)
     // Printout results
     turn = 1;
     while(1) {
-        SDL_Delay(10);// Wait 10ms.
+        SDL_Delay(1);// Wait 10ms.
         DoTurn(PARALLEL_FACTOR);
         SDLDrv_result(smem, &event_buf2, turn, BOARD_WIDTH, BOARD_HEIGHT);
         turn++;

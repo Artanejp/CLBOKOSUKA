@@ -22,9 +22,11 @@ CLSRCS = lifegame.cl
 
 CSRCS =	$(filter %.c, $(SRCS))
 CXXSRCS = $(filter %.cpp, $(SRCS))
+#CXXSRCS += $(patsubst %.cl,%.cpp,$(CLSRCS))
 
 OBJS = $(patsubst %.c,%.o,$(CSRCS))
 OBJS += $(patsubst %.cpp,%.o,$(CXXSRCS))
+OBJS += $(patsubst %.cl,%.o,$(CLSRCS))
 
 CFLAGS += -I${CLSDK_INC}
 CXXFLAGS = ${CFLAGS}
@@ -41,6 +43,11 @@ lifegame: ${OBJS}
 
 %.o: %.c
 	$(CC) ${CFLAGS} -o $@ -c $(filter %.c, $<)
+
+%.o: %.cl
+	gawk -f cl2cpp.awk -v VARNAME=$(patsubst %.cl,%,$<) $(filter %.cl, $<) > $(patsubst %.cl,%.cpp,$<)
+	$(CXX) ${CFLAGS} -o $@ -c $(patsubst %.cl,%.cpp,$<)
+	rm $(patsubst %.cl,%.cpp,$<)
 
 clean:
 	rm -f *~ *.o lifegame
