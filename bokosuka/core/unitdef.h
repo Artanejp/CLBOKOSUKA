@@ -58,7 +58,7 @@ typedef struct {
    uint16_t  level;  
    int32_t  expeliment;
    int32_t  reserve2[2];
-} CB_UnitParams __attribute__((__packed__));
+} CB_UnitParams __attribute__((__packed__,aligned(4)));
 
 typedef struct {
    int maxunits;
@@ -81,13 +81,13 @@ enum {
 typedef struct {
   uint8_t type;
   uint8_t attribute;
-} CB_MapParams __attribute__((__packed__));
+} CB_MapParams __attribute__((__packed__,aligned(4)));
    
 typedef struct {
   int16_t w;
   int16_t h;
   CB_MapParams *mapdata;
-} CB_MapData __attribute__((__packed__));
+} CB_MapData __attribute__((__packed__,aligned(4)));
    
 #ifdef __cplusplus
 }
