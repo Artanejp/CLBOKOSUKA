@@ -183,6 +183,7 @@ int main(void)
 //    codeSize = fread(srcStr, 1, SRCSIZE - 1, fp);
 //    fclose(fp);
     srcStr = (char *)lifegame;
+    codeSize = strlen(srcStr);
     
     // Build prepare program ID
     program = clCreateProgramWithSource(context, 1, (const char **)&srcStr,
